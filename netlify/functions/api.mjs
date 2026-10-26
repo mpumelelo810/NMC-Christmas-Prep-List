@@ -88,11 +88,6 @@ export default async (req) => {
     if (req.method === "POST" && action === "logout") {
       return response({ ok: true }, 200, { "set-cookie": "nmc_admin=; HttpOnly; Secure; SameSite=Strict; Path=/.netlify/functions/api; Max-Age=0" });
     }
-    if (!await isAdmin(req)) return response({ error: "Admin authentication required." }, 401);
-    if (req.method === "GET" && action === "admin") {
-      const { data } = await loadRegister();
-      return response({ items: data.items });
-    }
     if (req.method === "POST" && action === "claim") {
       const body = await req.json();
       if (!Number.isSafeInteger(body.id) || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.length > 80 || typeof (body.note || "") !== "string" || (body.note || "").length > 180) return response({ error: "Check the name and note fields." }, 400);
@@ -103,6 +98,11 @@ export default async (req) => {
       item.status = "taken"; item.claimant = body.name.trim(); item.note = (body.note || "").trim();
       await saveRegister(store, data);
       return response({ ok: true });
+    }
+    if (!await isAdmin(req)) return response({ error: "Admin authentication required." }, 401);
+    if (req.method === "GET" && action === "admin") {
+      const { data } = await loadRegister();
+      return response({ items: data.items });
     }
     if (req.method === "POST" && action === "mutate") {
       const body = await req.json();
