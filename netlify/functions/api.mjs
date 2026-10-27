@@ -2,7 +2,7 @@ import { getStore } from "@netlify/blobs";
 
 const STORE_NAME = "nmc-christmas-private-v1";
 const KEY = "register";
-const SEED = [
+const LEGACY_SEED = [
   ["Rice (10 kg)", "For the shared Christmas meal"], ["Chicken", "Fresh or frozen contribution"],
   ["Cooking oil", "Large bottle or 2 L"], ["Soft drinks", "Assorted drinks"], ["Bottled water", "Cases of drinking water"],
   ["Vegetables", "Fresh seasonal vegetables"], ["Bread rolls", "For serving with the meal"],
@@ -10,6 +10,41 @@ const SEED = [
   ["Cleaning supplies", "Soap, bin bags and disinfectant"], ["Christmas decorations", "Festive decorations for the venue"],
   ["Dessert or cake", "Something sweet to share"]
 ];
+// Actual congregation register. Contributor names and confirmation notes stay admin-only.
+const SEED = [
+  ["10 kg — Rice (Thai rice)", "", "taken", "Sis Thabile", "Confirm item wording"],
+  ["10 kg — Rice (Thai/sihlobo rice)", "", "taken", "Make Mamba", "Confirm item and name"],
+  ["5 kg — Samp", "", "taken", "MJ", "Confirm initials"],
+  ["2 L — Cooking oil", "", "taken", "Make Ncongwane", "Confirm name"],
+  ["2 L — Cooking oil", "", "available", "", ""],
+  ["5 kg — Onions", "", "available", "", ""],
+  ["10 kg — Potatoes", "", "taken", "Sis Thabile", ""],
+  ["5 kg — Carrots", "", "taken", "Palesa", "Confirm name and quantity"],
+  ["750 g — Mayonnaise", "", "taken", "Make Manzini", ""],
+  ["750 g — Mayonnaise", "", "taken", "Nkhosingiphile Manzini", "Confirm name"],
+  ["750 g — Mayonnaise", "", "available", "", ""],
+  ["750 g — Mayonnaise", "", "available", "", ""],
+  ["1 kg — Garlic", "", "available", "", "Confirm item"],
+  ["5 L — Squash / Oros", "", "taken", "Sis Zodwa", "Confirm item and quantity"],
+  ["5 kg — Butternut", "", "available", "", ""],
+  ["5 kg — Green pepper", "", "available", "", ""],
+  ["2 kg — Drumsticks", "", "taken", "Babe Dlamini", ""],
+  ["2 kg — Drumsticks", "", "taken", "Sakhe", ""],
+  ["2 kg — Drumsticks", "", "taken", "Sivikelwe", ""],
+  ["5 kg — Beef", "", "taken", "Make Mwelase", "Confirm name"],
+  ["5 kg — Beef", "", "taken", "Asandzesive Mwelase", "Confirm name"],
+  ["5 kg — Hake", "", "taken", "Sis Pearl", "Confirm item"],
+  ["5 kg — Hake", "", "taken", "Sis Pearl", "Confirm item"],
+  ["5 kg — Pork", "", "available", "", ""],
+  ["5 kg — Pork", "", "available", "", ""],
+  ["5 kg — Beetroot", "", "taken", "Sis Thabile", ""],
+  ["6 × 1 L — Milk", "", "taken", "Nondedo", "Confirm spelling"],
+  ["500 g — Custard", "", "available", "", ""],
+  ["500 g — Custard", "", "available", "", ""]
+];
+function seededItems() {
+  return SEED.map((x, i) => ({ id: i + 1, name: x[0], desc: x[1], status: x[2], claimant: x[3], note: x[4] }));
+}
 const enc = new TextEncoder();
 const b64 = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 const unb64 = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
@@ -22,8 +57,14 @@ async function encrypt(value) {
   return JSON.stringify(value);
 }
 async function decrypt(raw) {
-  if (!raw) return { items: SEED.map((x, i) => ({ id: i + 1, name: x[0], desc: x[1], status: "available", claimant: "", note: "" })) };
-  return JSON.parse(raw);
+  if (!raw) return { items: seededItems() };
+  const data = JSON.parse(raw);
+  // Safely migrate the old sample register once, while preserving any non-sample register.
+  if (Array.isArray(data.items) && data.items.length === LEGACY_SEED.length &&
+      data.items.every((item, i) => item.name === LEGACY_SEED[i][0])) {
+    return { ...data, items: seededItems() };
+  }
+  return data;
 }
 function response(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...extra } });
@@ -140,7 +181,7 @@ export default async (req) => {
         if (!item) return response({ error: "Item not found." }, 404);
         item.status = "available"; item.claimant = ""; item.note = "";
       } else if (body.operation === "reset") {
-        data.items = SEED.map((x, i) => ({ id: i + 1, name: x[0], desc: x[1], status: "available", claimant: "", note: "" }));
+        data.items = seededItems();
       } else return response({ error: "Unknown operation." }, 400);
       await saveRegister(store, data);
       return response({ ok: true, items: data.items });
