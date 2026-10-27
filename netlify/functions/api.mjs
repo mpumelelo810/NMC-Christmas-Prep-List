@@ -185,8 +185,6 @@ export default async (req) => {
         const item = data.items.find(x => x.id === body.id);
         if (!item) return response({ error: "Item not found." }, 404);
         item.status = "available"; item.claimant = ""; item.note = "";
-      } else if (body.operation === "reset") {
-        data.items = seededItems();
       } else return response({ error: "Unknown operation." }, 400);
       await saveRegister(store, data);
       return response({ ok: true, items: data.items });
