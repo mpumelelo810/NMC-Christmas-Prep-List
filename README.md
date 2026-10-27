@@ -1,38 +1,47 @@
-# NMC Christmas Prep List
+# NMC Christmas Planning Register
 
-Congregation-friendly Christmas contribution list for Ngculwini Miracle Center.
+A live, shared Christmas contribution register for Ngculwini Miracle Center.
 
-## Features
-- Public list shows item name, description, and availability only.
-- Contribution names and private notes are stored server-side in encrypted form.
-- Admin-only private register and Excel export with `Taken` and `Not Taken` sheets.
-- Admin item add/remove, cancellation approval, and reset controls.
-- Netlify Function API with server-side authentication; no admin password in frontend code.
-- Existing green/gold NMC design and motto retained.
+**Live site:** https://nmc-christmas-planning.netlify.app/
 
-## Required Netlify setup before real data is entered
+## Current features
+- Public contribution list with item counts and available/taken filters.
+- Available items are shown before already-taken items.
+- Public visitors can claim an available contribution by entering a name and optional note.
+- Contributor names and notes are returned only by the admin API after server-side authentication.
+- Admin can add items, approve cancellations, remove items, and export an Excel workbook with `Taken` and `Not Taken` sheets.
+- Netlify Function backend and Netlify Blobs storage.
 
-This repository is **not production-ready until these steps are complete and verified**.
+## Important production security notes
 
-1. Deploy this repository to Netlify with the Netlify Functions feature enabled. Build settings should use the repository root as the publish directory. `netlify.toml` configures the functions directory.
-2. In Netlify Site configuration / Environment variables, set these three variables for the production deploy context:
-   - `NMC_ADMIN_PASSWORD`: a long, unique administrator password (at least 16 characters recommended). Do not reuse another account password.
-   - `NMC_SESSION_SECRET`: a randomly generated secret with at least 32 characters.
-   - `NMC_ENCRYPTION_SECRET`: a separate randomly generated secret with at least 32 characters. **Keep this secret safe: changing or losing it makes existing encrypted register data unreadable.**
-3. Generate secrets locally using a trusted password manager or a local cryptographic random generator. Never put these values in GitHub, HTML, chat, screenshots, or public files.
-4. Redeploy after setting the variables. The API deliberately returns HTTP 503 until all required environment variables are present.
-5. Test in a private/incognito browser: the public list must not show contributor names or notes; wrong admin passwords must fail; correct login must allow private records and Excel export; logout must close admin access.
-6. Verify Netlify function logs and the live site after deployment. Do not enter real contributor information until all tests pass.
+This project is deployed and is being used as a real congregation register. Do not treat it as a disposable demo, and do not reset or replace its data without explicit approval.
 
-## Data and security notes
-- Register data is stored in Netlify Blobs using AES-GCM encryption at the application layer. Netlify Blobs is also a managed hosted storage service; account/site administrators may still have infrastructure-level access.
-- The browser only receives the public item fields unless the server validates the administrator session.
-- Excel files downloaded by an administrator contain personal data. Store them in an encrypted folder and do not commit them to this repository.
-- Keep separate secure backups of both the encrypted register and the encryption secret. Do not change the encryption secret without a migration plan.
-- The storage API uses a single encrypted JSON register and is suitable only for a small, low-concurrency list. Netlify Blobs is key/value storage and concurrent simultaneous claims can race; this is not a relational database or an immutable audit ledger.
-- Public claims are anonymous by design, so avoid collecting sensitive personal information. For higher-risk or larger-scale use, use an authenticated form or a database with transactional writes and audit logs.
-- Netlify's free plan has usage limits. Check the current Netlify dashboard and plan limits; no third-party hosting service can be guaranteed free at every traffic level.
-- The old browser-only demo data is not automatically migrated. Do not assume any names stored in a browser's previous localStorage have been copied into the shared register.
+The current backend implementation has important limitations that must be addressed before describing the system as fully production-hardened:
 
-## Initial list
-Rice (10 kg), Chicken, Cooking oil, Soft drinks, Bottled water, Vegetables, Bread rolls, Paper plates and cups, Napkins, Cleaning supplies, Christmas decorations, Dessert or cake.
+1. **Storage is not encrypted by the application right now.** The current `encrypt()` function serializes JSON directly, despite the name. Do not claim application-layer encryption at rest until authenticated encryption is implemented and deployed with a securely configured key.
+2. **The admin password has an insecure fallback.** If `NMC_ADMIN_PASSWORD` is not configured, the backend falls back to `12345`. Set a strong, unique `NMC_ADMIN_PASSWORD` in Netlify environment variables and redeploy. Never put secrets in GitHub, source code, chat, or screenshots.
+3. **Password change support exists in the API but not in the admin interface.** A secure admin password should be configured through Netlify before normal operation; the UI should not imply that password management is complete.
+4. **No login rate limiting or lockout is implemented.** A wrong password is rejected, but repeated attempts are not throttled by this application.
+5. **Netlify Blobs uses a single JSON register.** Simultaneous claims can race because the app does not use a transactional database or atomic compare-and-set operation. This is acceptable only for low-concurrency use and should be tested carefully.
+6. **Backups and restore procedures must be arranged separately.** Export the private register securely as needed; Excel exports contain contributor names and notes and must not be committed to this repository.
+7. **Hosting cost is not guaranteed to remain zero.** Check the current Netlify plan and usage limits. Do not assume that any hosted service is unlimited or permanently free.
+
+## Safe operational rules
+- Never use reset or seed operations against the live register as a test.
+- Never test claims by submitting real items on the live site.
+- Never publish contributor names or notes.
+- Test changes in a separate staging deployment with synthetic data where possible.
+- Before backend or storage migrations, make a verified backup and document a rollback plan.
+- Keep the public site usable on mobile and on slower connections.
+
+## Current register snapshot
+
+The live page was inspected on 27 October 2026. At the time of inspection it displayed 29 items: 11 available and 18 taken. These counts are a snapshot, not a hard-coded guarantee; the shared register may change as congregants make contributions.
+
+## Deployment
+- Netlify publishes the repository root.
+- Netlify Functions are in `netlify/functions`.
+- `netlify.toml` configures the build and response headers.
+- The API endpoint is `/.netlify/functions/api`.
+
+Review the live deployment after each change. A successful GitHub commit does not by itself prove that the Netlify production deploy completed or that all workflows work.
