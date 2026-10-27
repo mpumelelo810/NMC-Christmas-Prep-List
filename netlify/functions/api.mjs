@@ -12,33 +12,33 @@ const LEGACY_SEED = [
 ];
 // Actual congregation register. Contributor names and confirmation notes stay admin-only.
 const SEED = [
-  ["10 kg — Rice (Thai rice)", "", "taken", "Sis Thabile", "Confirm item wording"],
-  ["10 kg — Rice (Thai/sihlobo rice)", "", "taken", "Make Mamba", "Confirm item and name"],
-  ["5 kg — Samp", "", "taken", "MJ", "Confirm initials"],
-  ["2 L — Cooking oil", "", "taken", "Make Ncongwane", "Confirm name"],
+  ["10 kg — Rice (Thai rice)", "", "taken", "Sis Thabile", ""],
+  ["10 kg — Rice ( Thai/sihlobo rice)", "", "taken", "Make Mamba", ""],
+  ["5 kg — Samp", "", "taken", "MJ", ""],
+  ["2 L — Cooking oil", "", "taken", "Make Ncongwane", ""],
   ["2 L — Cooking oil", "", "available", "", ""],
   ["5 kg — Onions", "", "available", "", ""],
   ["10 kg — Potatoes", "", "taken", "Sis Thabile", ""],
-  ["5 kg — Carrots", "", "taken", "Palesa", "Confirm name and quantity"],
+  ["5 kg — Carrots", "", "taken", "Palesa", ""],
   ["750 g — Mayonnaise", "", "taken", "Make Manzini", ""],
-  ["750 g — Mayonnaise", "", "taken", "Nkhosingiphile Manzini", "Confirm name"],
+  ["750 g — Mayonnaise", "", "taken", "Nkhosingiphile Manzini", ""],
   ["750 g — Mayonnaise", "", "available", "", ""],
   ["750 g — Mayonnaise", "", "available", "", ""],
-  ["1 kg — Garlic", "", "available", "", "Confirm item"],
-  ["5 L — Squash / Oros", "", "taken", "Sis Zodwa", "Confirm item and quantity"],
+  ["1 kg — Garlic", "", "available", "", ""],
+  ["5 L — Squash /Oros", "", "taken", "Sis Zodwa", ""],
   ["5 kg — Butternut", "", "available", "", ""],
   ["5 kg — Green pepper", "", "available", "", ""],
   ["2 kg — Drumsticks", "", "taken", "Babe Dlamini", ""],
   ["2 kg — Drumsticks", "", "taken", "Sakhe", ""],
   ["2 kg — Drumsticks", "", "taken", "Sivikelwe", ""],
-  ["5 kg — Beef", "", "taken", "Make Mwelase", "Confirm name"],
-  ["5 kg — Beef", "", "taken", "Asandzesive Mwelase", "Confirm name"],
-  ["5 kg — Hake", "", "taken", "Sis Pearl", "Confirm item"],
-  ["5 kg — Hake", "", "taken", "Sis Pearl", "Confirm item"],
+  ["5 kg — Beef", "", "taken", "Make Mwelase", ""],
+  ["5 kg — Beef", "", "taken", "Asandzesive Mwelase", ""],
+  ["5 kg — Hake", "", "taken", "Sis Pearl", ""],
+  ["5 kg — Hake", "", "taken", "Sis Pearl", ""],
   ["5 kg — Pork", "", "available", "", ""],
   ["5 kg — Pork", "", "available", "", ""],
   ["5 kg — Beetroot", "", "taken", "Sis Thabile", ""],
-  ["6 × 1 L — Milk", "", "taken", "Nondedo", "Confirm spelling"],
+  ["6 × 1 L — Milk", "", "taken", "Nondedo", ""],
   ["500 g — Custard", "", "available", "", ""],
   ["500 g — Custard", "", "available", "", ""]
 ];
@@ -60,8 +60,13 @@ async function decrypt(raw) {
   if (!raw) return { items: seededItems() };
   const data = JSON.parse(raw);
   // Safely migrate the old sample register once, while preserving any non-sample register.
-  if (Array.isArray(data.items) && data.items.length === LEGACY_SEED.length &&
-      data.items.every((item, i) => item.name === LEGACY_SEED[i][0])) {
+  if (Array.isArray(data.items) && (
+      (data.items.length === LEGACY_SEED.length &&
+       data.items.every((item, i) => item.name === LEGACY_SEED[i][0])) ||
+      (data.items.length === SEED.length &&
+       data.items.every((item, i) => String(item.name || "").trim().replace(/\\s+/g, " ") === SEED[i][0].trim().replace(/\\s+/g, " ")))
+    )) {
+    // The administrator supplied the definitive list; sync its exact names and statuses.
     return { ...data, items: seededItems() };
   }
   return data;
