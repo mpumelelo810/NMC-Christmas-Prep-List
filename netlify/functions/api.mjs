@@ -54,6 +54,28 @@ function configured() {
   return Boolean(process.env.NMC_ADMIN_PASSWORD && process.env.NMC_SESSION_SECRET && process.env.NMC_ENCRYPTION_SECRET &&
     process.env.NMC_SESSION_SECRET.length >= 32 && process.env.NMC_ENCRYPTION_SECRET.length >= 32);
 }
+const PASSWORD_KEY = "admin-password";
+async function passwordDigest(password, salt) {
+  const material = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: unb64(salt), iterations: 210000, hash: "SHA-256" }, material, 256);
+  return b64(bits);
+}
+async function verifyPassword(password) {
+  const store = getStore(STORE_NAME);
+  const saved = await store.get(PASSWORD_KEY);
+  if (!saved) return password === process.env.NMC_ADMIN_PASSWORD;
+  try {
+    const record = JSON.parse(saved);
+    const candidate = await passwordDigest(password, record.salt);
+    return candidate === record.hash;
+  } catch { return false; }
+}
+async function changePassword(password) {
+  const salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+  const hash = await passwordDigest(password, salt);
+  const store = getStore(STORE_NAME);
+  await store.set(PASSWORD_KEY, JSON.stringify({ v: 1, salt, hash }));
+}
 async function loadRegister() {
   const store = getStore(STORE_NAME);
   const raw = await store.get(KEY);
@@ -80,10 +102,20 @@ export default async (req) => {
     if (req.method === "POST" && action === "login") {
       const body = await req.json();
       if (typeof body.password !== "string" || body.password.length > 200) return response({ error: "Invalid login." }, 400);
-      if (body.password !== process.env.NMC_ADMIN_PASSWORD) return response({ error: "Incorrect password." }, 401);
+      if (!(await verifyPassword(body.password))) return response({ error: "Incorrect password." }, 401);
       const payload = b64(enc.encode(JSON.stringify({ exp: Date.now() + 8 * 60 * 60 * 1000 })));
       const signature = await hmac(payload);
       return response({ ok: true }, 200, { "set-cookie": `nmc_admin=${payload}.${signature}; HttpOnly; Secure; SameSite=Strict; Path=/.netlify/functions/api; Max-Age=28800` });
+    }
+    if (req.method === "POST" && action === "change-password") {
+      if (!await isAdmin(req)) return response({ error: "Admin authentication required." }, 401);
+      const body = await req.json();
+      if (typeof body.currentPassword !== "string" || typeof body.newPassword !== "string") return response({ error: "Enter both passwords." }, 400);
+      if (!(await verifyPassword(body.currentPassword))) return response({ error: "Current password is incorrect." }, 401);
+      if (body.newPassword.length < 12 || body.newPassword.length > 200) return response({ error: "Choose a new password with at least 12 characters." }, 400);
+      if (body.newPassword === body.currentPassword) return response({ error: "Choose a password different from the current one." }, 400);
+      await changePassword(body.newPassword);
+      return response({ ok: true });
     }
     if (req.method === "POST" && action === "logout") {
       return response({ ok: true }, 200, { "set-cookie": "nmc_admin=; HttpOnly; Secure; SameSite=Strict; Path=/.netlify/functions/api; Max-Age=0" });
